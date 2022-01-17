@@ -1,7 +1,7 @@
 ## Dto mapper
 
 <a href="https://pkg.go.dev/github.com/dranikpg/dto-mapper"><img src="https://godoc.org/github.com/dranikpg/dto-mapper?status.svg" /></a>
-<a href="https://goreportcard.com/report/github.com/dranikpg/dto-mapper"><img src="https://goreportcard.com/badge/github.com/dranikpg/dto-mapper" /></a>
+[![Go Report Card](https://goreportcard.com/badge/github.com/dranikpg/dto-mapper?fix-cache-1)](https://goreportcard.com/report/github.com/dranikpg/dto-mapper)
 
 dto-mapper is an easy-to-use library for complex struct mapping. It's intended for the creation of [data transfer objects](https://en.wikipedia.org/wiki/Data_transfer_object), hence the name.
 
@@ -111,7 +111,7 @@ mapper.AddInspectFunc(func(dto *UserDto) {
 They can also be defined with a specific source type. The last argument is optional.
 
 ```go
-mapper.AddInspectFunc(func(dto *UserDto, user User, im *Mapper) {
+mapper.AddInspectFunc(func(dto *UserDto, user User, mapper *Mapper) {
     dto.Online = IsRecent(user.LastSeen)
 })
 ```
@@ -132,7 +132,7 @@ mapper.AddInspectFunc(func(dto *UserDto) error {
     return nil
 })
 
-err := mapper.Map(&to, from)
+err := mapper.Map(&to, from) // error: malformed link
 ```
 
 ### Performance
