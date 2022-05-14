@@ -375,25 +375,38 @@ func (m *Mapper) mapValue(toRv, fromRv reflect.Value) (returnError error) {
 
 	// 4. Handle pointers by dereferencing from
 	if fk == reflect.Ptr {
+		// Skip null pointers
+		if fromRv.IsNil() {
+			return nil
+		}
 		return m.mapValue(toRv, fromRv.Elem())
 	}
 
-	// 5. Handle sructs
+	// 5. Handle pointers by dereferencing to
+	if tk == reflect.Ptr {
+		// Allocate new value if nil
+		if toRv.IsNil() {
+			toRv.Set(reflect.New(toRv.Type().Elem()))
+		}
+		return m.mapValue(toRv.Elem(), fromRv)
+	}
+
+	// 6. Handle sructs
 	if tk == reflect.Struct && fk == reflect.Struct {
 		return m.mapStructs(toRv, fromRv)
 	}
 
-	// 6. Handle slices
+	// 7. Handle slices
 	if tk == reflect.Slice && fk == reflect.Slice {
 		return m.mapSlice(toRv, fromRv)
 	}
 
-	// 7. Handle maps
+	// 8. Handle maps
 	if tk == reflect.Map && fk == reflect.Map {
 		return m.mapMap(toRv, fromRv)
 	}
 
-	// 8. Handle map to slice
+	// 9. Handle map to slice
 	if tk == reflect.Slice && fk == reflect.Map {
 		err := m.mapMapToSlice(toRv, fromRv)
 

@@ -309,6 +309,43 @@ func TestDontSkipFunctions(t *testing.T) {
 	assert.Equal(t, testError, err)
 }
 
+func TestPointerCases(t *testing.T) {
+	{
+		var fromProduct = struct {
+			Prod *Product
+		}{Prod: nil}
+		var outProduct struct {
+			Prod Product
+		}
+		Map(&outProduct, fromProduct)
+		assert.Zero(t, outProduct.Prod)
+	}
+	{
+		var fromProduct = struct {
+			Prod Product
+		}{Prod: commonProducts[0]}
+		var outProduct struct {
+			Prod *Product
+		}
+		Map(&outProduct, fromProduct)
+		assert.NotNil(t, outProduct.Prod)
+		assert.Equal(t, commonProducts[0], *outProduct.Prod)
+	}
+	{
+		type SubProduct struct {
+			Name string
+		}
+		var fromProduct = struct {
+			Prod *Product
+		}{Prod: &commonProducts[0]}
+		var outProduct struct {
+			Prod *SubProduct
+		}
+		Map(&outProduct, fromProduct)
+		assert.Equal(t, commonProducts[0].Name, outProduct.Prod.Name)
+	}
+}
+
 // ==================================== Benchmarks ============================
 
 type benchCart = struct {
