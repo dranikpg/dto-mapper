@@ -266,7 +266,7 @@ func TestErrorNoValidMapping(t *testing.T) {
 		Name int
 	}
 	err := Map(&outProduct, commonProducts[0])
-	assert.ErrorIs(t, err, ErrNoValidMapping{
+	assert.ErrorIs(t, err, NoValidMappingError{
 		ToType:   reflect.TypeOf(int(0)),
 		FromType: reflect.TypeOf(string("")),
 	})

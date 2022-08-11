@@ -31,13 +31,13 @@ var mapperPtrRfType = reflect.TypeOf((*Mapper)(nil))
 type convertFuncClosure = func(reflect.Value, *Mapper) (reflect.Value, error)
 type inspectFuncClosure = func(reflect.Value, reflect.Value, *Mapper) error
 
-// ErrNoValidMapping indicates that no valid mapping was found
-type ErrNoValidMapping struct {
+// NoValidMappingError indicates that no valid mapping was found
+type NoValidMappingError struct {
 	ToType   reflect.Type
 	FromType reflect.Type
 }
 
-func (nvme ErrNoValidMapping) Error() string {
+func (nvme NoValidMappingError) Error() string {
 	return fmt.Sprintf("No valid mapping found for %v from %v", nvme.ToType, nvme.FromType)
 }
 
@@ -97,19 +97,19 @@ func isCompositeKind(k reflect.Kind) bool {
 
 // ==================================== Conversion and inspection functions ===
 
-// Run inspect functions for (to-from) pair
-func (m *Mapper) runInspectFuncs(toRv, fromRv reflect.Value) error {
-	toMap, ok := m.postFunc[toRv.Type()]
+// Run inspect functions for (dst-src) pair
+func (m *Mapper) runInspectFuncs(dstRv, srcRv reflect.Value) error {
+	toMap, ok := m.postFunc[dstRv.Type()]
 	if !ok {
 		return nil
 	}
-	for _, recvType := range []reflect.Type{fromRv.Type(), nilRecvRfType} {
+	for _, recvType := range []reflect.Type{srcRv.Type(), nilRecvRfType} {
 		funcs, ok := toMap[recvType]
 		if !ok {
 			continue
 		}
 		for _, fun := range funcs {
-			if err := fun(toRv.Addr(), fromRv, m); err != nil {
+			if err := fun(dstRv.Addr(), srcRv, m); err != nil {
 				return err
 			}
 		}
@@ -117,19 +117,19 @@ func (m *Mapper) runInspectFuncs(toRv, fromRv reflect.Value) error {
 	return nil
 }
 
-// Run convert function for (to-from) pair
+// Run convert function for (dst-src) pair
 // Returns (error, true) if a valid function was found, (nil, false) otherwise
-func (m *Mapper) runConvFuncs(toRv, fromRv reflect.Value) (bool, error) {
-	toMap, ok := m.convFunc[fromRv.Type()]
+func (m *Mapper) runConvFuncs(dstRv, srcRv reflect.Value) (bool, error) {
+	toMap, ok := m.convFunc[srcRv.Type()]
 	if !ok {
 		return false, nil
 	}
-	if convertFunc, ok := toMap[toRv.Type()]; ok {
-		val, err := convertFunc(fromRv, m)
+	if convertFunc, ok := toMap[dstRv.Type()]; ok {
+		val, err := convertFunc(srcRv, m)
 		if err != nil {
 			return true, err
 		}
-		toRv.Set(val)
+		dstRv.Set(val)
 		return true, nil
 	}
 	return false, nil
@@ -258,32 +258,32 @@ func (m *Mapper) mapSlice(toRv, fromRv reflect.Value) error {
 
 // Map maps
 // Panics if arguments are not maps
-func (m *Mapper) mapMap(toRv, fromRv reflect.Value) error {
-	toRv.Set(reflect.MakeMapWithSize(toRv.Type(), fromRv.Len()))
+func (m *Mapper) mapMap(dstRv, srcRv reflect.Value) error {
+	dstRv.Set(reflect.MakeMapWithSize(dstRv.Type(), srcRv.Len()))
 	// Map values
-	mapIt := fromRv.MapRange()
+	mapIt := srcRv.MapRange()
 	for mapIt.Next() {
-		toKey := reflect.New(toRv.Type().Key()).Elem()
-		toValue := reflect.New(toRv.Type().Elem()).Elem()
+		toKey := reflect.New(dstRv.Type().Key()).Elem()
+		toValue := reflect.New(dstRv.Type().Elem()).Elem()
 		if err := m.mapValue(toKey, mapIt.Key()); err != nil {
 			return err
 		}
 		if err := m.mapValue(toValue, mapIt.Value()); err != nil {
 			return err
 		}
-		toRv.SetMapIndex(toKey, toValue)
+		dstRv.SetMapIndex(toKey, toValue)
 	}
 	return nil
 }
 
 // Map structs
 // Panics if arguments are not structs
-func (m *Mapper) mapStructs(toRv, fromRv reflect.Value) error {
+func (m *Mapper) mapStructs(dstRv, srcRv reflect.Value) error {
 	toFields := make(structValueMap)
-	collectStructFields(toRv, toRv.Type(), toFields)
+	collectStructFields(dstRv, dstRv.Type(), toFields)
 
 	fromFields := make(structValueMap)
-	collectStructFields(fromRv, fromRv.Type(), fromFields)
+	collectStructFields(srcRv, srcRv.Type(), fromFields)
 
 	for fieldName, toValue := range toFields {
 		fromValue, ok := fromFields[fieldName]
@@ -301,12 +301,12 @@ func (m *Mapper) mapStructs(toRv, fromRv reflect.Value) error {
 
 // Map map values to slice
 // Panics if arguments are not slice and map accordingly
-func (m *Mapper) mapMapToSlice(toRv, fromRv reflect.Value) error {
-	toRv.Set(reflect.MakeSlice(toRv.Type(), fromRv.Len(), fromRv.Len()))
+func (m *Mapper) mapMapToSlice(dstRv, srcRv reflect.Value) error {
+	dstRv.Set(reflect.MakeSlice(dstRv.Type(), srcRv.Len(), srcRv.Len()))
 	i := 0
-	mapIt := fromRv.MapRange()
+	mapIt := srcRv.MapRange()
 	for mapIt.Next() {
-		if err := m.mapValue(toRv.Index(i), mapIt.Value()); err != nil {
+		if err := m.mapValue(dstRv.Index(i), mapIt.Value()); err != nil {
 			return err
 		}
 		i++
@@ -316,22 +316,22 @@ func (m *Mapper) mapMapToSlice(toRv, fromRv reflect.Value) error {
 
 // Map a map of slices to slice
 // Panics of arguments are not a map of slices and a slice accordingly
-func (m *Mapper) mapMapSlicesToSlice(toRv, fromRv reflect.Value) error {
+func (m *Mapper) mapMapSlicesToSlice(dstRv, srcRv reflect.Value) error {
 	// calculate length
 	sumLen := 0
-	mapIt := fromRv.MapRange()
+	mapIt := srcRv.MapRange()
 	for mapIt.Next() {
 		sumLen += mapIt.Value().Len()
 	}
 
-	toRv.Set(reflect.MakeSlice(toRv.Type(), sumLen, sumLen))
+	dstRv.Set(reflect.MakeSlice(dstRv.Type(), sumLen, sumLen))
 
 	i := 0
-	mapIt = fromRv.MapRange()
+	mapIt = srcRv.MapRange()
 	for mapIt.Next() {
 		mapSlice := mapIt.Value()
 		for j := 0; j < mapSlice.Len(); i, j = i+1, j+1 {
-			if err := m.mapValue(toRv.Index(i), mapSlice.Index(j)); err != nil {
+			if err := m.mapValue(dstRv.Index(i), mapSlice.Index(j)); err != nil {
 				return err
 			}
 		}
@@ -341,19 +341,19 @@ func (m *Mapper) mapMapSlicesToSlice(toRv, fromRv reflect.Value) error {
 }
 
 // Try to map any value
-func (m *Mapper) mapValue(toRv, fromRv reflect.Value) (returnError error) {
-	tk, fk := toRv.Type().Kind(), fromRv.Type().Kind()
+func (m *Mapper) mapValue(dstRv, srcRv reflect.Value) (returnError error) {
+	tk, fk := dstRv.Type().Kind(), srcRv.Type().Kind()
 
 	// Defer inspect functions
 	defer func() {
 		if returnError != nil {
 			return
 		}
-		returnError = m.runInspectFuncs(toRv, fromRv)
+		returnError = m.runInspectFuncs(dstRv, srcRv)
 	}()
 
 	// 1. Check conversion functions
-	converted, err := m.runConvFuncs(toRv, fromRv)
+	converted, err := m.runConvFuncs(dstRv, srcRv)
 	if converted {
 		return err
 	}
@@ -361,14 +361,14 @@ func (m *Mapper) mapValue(toRv, fromRv reflect.Value) (returnError error) {
 	// don't skip calling functions for assignable types
 	if !m.HasCustomFuncs() || !isCompositeKind(fk) {
 		// 2. Check direct assignment
-		if fromRv.Type().AssignableTo(toRv.Type()) {
-			toRv.Set(fromRv)
+		if srcRv.Type().AssignableTo(dstRv.Type()) {
+			dstRv.Set(srcRv)
 			return
 		}
 
 		// 3. Check conversion
-		if fromRv.Type().ConvertibleTo(toRv.Type()) {
-			toRv.Set(fromRv.Convert(toRv.Type()))
+		if srcRv.Type().ConvertibleTo(dstRv.Type()) {
+			dstRv.Set(srcRv.Convert(dstRv.Type()))
 			return
 		}
 	}
@@ -376,45 +376,45 @@ func (m *Mapper) mapValue(toRv, fromRv reflect.Value) (returnError error) {
 	// 4. Handle pointers by dereferencing from
 	if fk == reflect.Ptr {
 		// Skip null pointers
-		if fromRv.IsNil() {
+		if srcRv.IsNil() {
 			return nil
 		}
-		return m.mapValue(toRv, fromRv.Elem())
+		return m.mapValue(dstRv, srcRv.Elem())
 	}
 
 	// 5. Handle pointers by dereferencing to
 	if tk == reflect.Ptr {
 		// Allocate new value if nil
-		if toRv.IsNil() {
-			toRv.Set(reflect.New(toRv.Type().Elem()))
+		if dstRv.IsNil() {
+			dstRv.Set(reflect.New(dstRv.Type().Elem()))
 		}
-		return m.mapValue(toRv.Elem(), fromRv)
+		return m.mapValue(dstRv.Elem(), srcRv)
 	}
 
 	// 6. Handle sructs
 	if tk == reflect.Struct && fk == reflect.Struct {
-		return m.mapStructs(toRv, fromRv)
+		return m.mapStructs(dstRv, srcRv)
 	}
 
 	// 7. Handle slices
 	if tk == reflect.Slice && fk == reflect.Slice {
-		return m.mapSlice(toRv, fromRv)
+		return m.mapSlice(dstRv, srcRv)
 	}
 
 	// 8. Handle maps
 	if tk == reflect.Map && fk == reflect.Map {
-		return m.mapMap(toRv, fromRv)
+		return m.mapMap(dstRv, srcRv)
 	}
 
 	// 9. Handle map to slice
 	if tk == reflect.Slice && fk == reflect.Map {
-		err := m.mapMapToSlice(toRv, fromRv)
+		err := m.mapMapToSlice(dstRv, srcRv)
 
 		// 9. Handle map of slices to slice
-		mapElemK := fromRv.Type().Elem().Kind()
-		if errors.As(err, &ErrNoValidMapping{}) && mapElemK == reflect.Slice {
+		mapElemK := srcRv.Type().Elem().Kind()
+		if errors.As(err, &NoValidMappingError{}) && mapElemK == reflect.Slice {
 			// dont propagate errors
-			if errFlatten := m.mapMapSlicesToSlice(toRv, fromRv); errFlatten == nil {
+			if errFlatten := m.mapMapSlicesToSlice(dstRv, srcRv); errFlatten == nil {
 				return
 			}
 		}
@@ -422,21 +422,21 @@ func (m *Mapper) mapValue(toRv, fromRv reflect.Value) (returnError error) {
 		return err
 	}
 
-	return ErrNoValidMapping{
-		ToType:   toRv.Type(),
-		FromType: fromRv.Type(),
+	return NoValidMappingError{
+		ToType:   dstRv.Type(),
+		FromType: srcRv.Type(),
 	}
 }
 
 // ==================================== Public helpers ========================
 
-// Map transfers values from `from` to `to`
-func (m *Mapper) Map(to, from interface{}) error {
-	return m.mapValue(reflectValueRemovePtr(to), reflectValueRemovePtr(from))
+// Map transfers values from src to dst
+func (m *Mapper) Map(dst, src interface{}) error {
+	return m.mapValue(reflectValueRemovePtr(dst), reflectValueRemovePtr(src))
 }
 
-// Map transfers values from `from` to `to` with a new Mapper
-func Map(to, from interface{}) error {
+// Map transfers values from src to dst
+func Map(dst, src interface{}) error {
 	m := Mapper{}
-	return m.Map(to, from)
+	return m.Map(dst, src)
 }
