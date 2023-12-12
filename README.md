@@ -79,6 +79,23 @@ type UserDto struct {
 }
 ```
 
+##### Ignored fields
+
+If you need to ignore any of the structure fields, you can apply the structure tag - dto:ignore
+
+```go
+type Order struct {
+	Id string
+
+	json.Marshaler   `dto:"ignore"`
+	json.Unmarshaler `dto:"ignore"`
+}
+
+type OrderDto struct {
+	Id string
+}
+```
+
 #### Mapper instances
 
 Local mapper instances can be used to add conversion and inspection functions. Mappers don't change their internal state during mapping, so they can be reused at any time.

@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -35,6 +36,17 @@ type RawPassword = string
 type User struct {
 	Name     string
 	Password RawPassword
+}
+
+type Order struct {
+	Id string
+
+	json.Marshaler   `dto:"ignore"`
+	json.Unmarshaler `dto:"ignore"`
+}
+
+type OrderDto struct {
+	Id string
 }
 
 // ==================================== Data for tests ========================
@@ -344,6 +356,13 @@ func TestPointerCases(t *testing.T) {
 		Map(&outProduct, fromProduct)
 		assert.Equal(t, commonProducts[0].Name, outProduct.Prod.Name)
 	}
+}
+
+func TestStructureTagIgnoreCase(t *testing.T) {
+	order := Order{Id: "test"}
+	var outOrder OrderDto
+	Map(&outOrder, order)
+	assert.Equal(t, order.Id, outOrder.Id)
 }
 
 // ==================================== Benchmarks ============================

@@ -17,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 )
 
 type structValueMap = map[string]reflect.Value
@@ -30,6 +31,8 @@ var mapperPtrRfType = reflect.TypeOf((*Mapper)(nil))
 
 type convertFuncClosure = func(reflect.Value, *Mapper) (reflect.Value, error)
 type inspectFuncClosure = func(reflect.Value, reflect.Value, *Mapper) error
+
+const structTag = "dto"
 
 // NoValidMappingError indicates that no valid mapping was found
 type NoValidMappingError struct {
@@ -55,6 +58,11 @@ func collectStructFields(rfValue reflect.Value, rfType reflect.Type, fields stru
 	for i := 0; i < rfType.NumField(); i++ {
 		fieldValue := rfValue.Field(i)
 		fieldType := rfType.Field(i)
+		if tags, ok := fieldType.Tag.Lookup(structTag); ok {
+			if strings.Contains(tags, "ignore") {
+				continue
+			}
+		}
 		if fieldType.Anonymous {
 			collectStructFields(fieldValue, fieldType.Type, fields)
 		} else {
