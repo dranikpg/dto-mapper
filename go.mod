@@ -1,4 +1,4 @@
-module github.com/dranikpg/dto-mapper
+module github.com/osendo/dto-mapper
 
 go 1.17
 
