@@ -306,21 +306,6 @@ func TestErrorPropagation(t *testing.T) {
 	assert.Equal(t, testError, err)
 }
 
-// Test custom functions are not skipped for assignable types
-func TestDontSkipFunctions(t *testing.T) {
-	var outProduct Product
-	testProduct := commonProducts[0]
-
-	testError := errors.New("Called!")
-
-	m := Mapper{}
-	m.AddConvFunc(func(s string) (string, error) {
-		return "", testError
-	})
-	err := m.Map(&outProduct, testProduct)
-	assert.Equal(t, testError, err)
-}
-
 func TestPointerCases(t *testing.T) {
 	{
 		var fromProduct = struct {

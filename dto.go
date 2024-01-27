@@ -93,16 +93,6 @@ func errorFromReflectValue(rv reflect.Value) error {
 	return err
 }
 
-// isCompositeKind returns true if this type contains other types (is composite)
-func isCompositeKind(k reflect.Kind) bool {
-	switch k {
-	case reflect.Struct, reflect.Slice, reflect.Map:
-		return true
-	default:
-		return false
-	}
-}
-
 // ==================================== Conversion and inspection functions ===
 
 // Run inspect functions for (dst-src) pair
@@ -366,19 +356,16 @@ func (m *Mapper) mapValue(dstRv, srcRv reflect.Value) (returnError error) {
 		return err
 	}
 
-	// don't skip calling functions for assignable types
-	if !m.HasCustomFuncs() || !isCompositeKind(fk) {
-		// 2. Check direct assignment
-		if srcRv.Type().AssignableTo(dstRv.Type()) {
-			dstRv.Set(srcRv)
-			return
-		}
+	// 2. Check direct assignment
+	if srcRv.Type().AssignableTo(dstRv.Type()) {
+		dstRv.Set(srcRv)
+		return
+	}
 
-		// 3. Check conversion
-		if srcRv.Type().ConvertibleTo(dstRv.Type()) {
-			dstRv.Set(srcRv.Convert(dstRv.Type()))
-			return
-		}
+	// 3. Check conversion
+	if srcRv.Type().ConvertibleTo(dstRv.Type()) {
+		dstRv.Set(srcRv.Convert(dstRv.Type()))
+		return
 	}
 
 	// 4. Handle pointers by dereferencing from

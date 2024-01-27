@@ -107,7 +107,7 @@ mapper.Map(&to, from)
 
 ##### Conversion functions
 
-They are used to convert one type into another. Conversion functions have the highest priority. The second argument is the current mapper instance and is optional.
+They are used to convert one type into another and have the highest priority, however they are not applied to fields of directly assignable structs. The second argument is the current mapper instance and is optional.
 
 ```go
 mapper.AddConvFunc(func(p RawPassword, mapper *Mapper) PasswordHash {
@@ -117,7 +117,7 @@ mapper.AddConvFunc(func(p RawPassword, mapper *Mapper) PasswordHash {
 
 ##### Inspection functions 
 
-Those are triggered _after_ a value has been successfully mapped. The value is **always taken by pointer**.
+Those are triggered _after_ a value has been successfully mapped. The value is **always taken by pointer**. Likewise to conversion functions, they are not called for fields of directly assignable structs.
 
 ```go
 mapper.AddInspectFunc(func(dto *UserDto) {
